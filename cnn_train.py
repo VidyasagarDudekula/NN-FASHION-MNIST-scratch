@@ -69,7 +69,16 @@ class ConvolutionNN(nn.Module):
         self.pooling2 = nn.MaxPool2d(2, stride=2) # out dim -> [batch, 256, 6, 6]
         self.dp2 = nn.Dropout(0.1)
         self.flatten = nn.Flatten(start_dim=1, end_dim=-1) # [batch, 256*6*6]
-        self.proj = nn.Linear(in_features=128*6*6, out_features=10)
+        self.ln1 = nn.Linear(in_features=128*6*6, out_features=1024)
+        self.relu3 = nn.ReLU()
+        self.layer_norm1 = nn.LayerNorm(1024)
+        self.dp3 = nn.Dropout(0.1)
+        self.ln2 = nn.Linear(in_features=1024, out_features=1024)
+        self.relu4 = nn.ReLU()
+        self.layer_norm2 = nn.LayerNorm(1024)
+        self.dp4 = nn.Dropout(0.1)
+        self.proj = nn.Linear(in_features=1024, out_features=10)
+        
     
     def forward(self, inputs):
         inputs = self.conv1(inputs)
@@ -83,6 +92,14 @@ class ConvolutionNN(nn.Module):
         inputs = self.pooling2(inputs)
         inputs = self.dp2(inputs)
         inputs = self.flatten(inputs)
+        inputs = self.ln1(inputs)
+        inputs = self.relu3(inputs)
+        inputs = self.layer_norm1(inputs)
+        inputs = self.dp3(inputs)
+        inputs = self.ln2(inputs)
+        inputs = self.relu4(inputs)
+        inputs = self.layer_norm2(inputs)
+        inputs = self.dp4(inputs)
         inputs = self.proj(inputs)
         return inputs
 
@@ -122,7 +139,7 @@ for epoch in range(10):
         model.zero_grad()
         out = model(xb)
         loss = criterion(out, yb)
-        if step % 50==0:
+        if step % 50 == 0:
             stepi.append(step)
             lossi.append(loss.item())
             evali.append(eval_loss())

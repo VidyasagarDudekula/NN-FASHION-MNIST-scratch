@@ -11,14 +11,25 @@ This project demonstrates the power of convolutional neural networks by comparin
 | Model | Test Accuracy | Test Loss | Architecture |
 |:------|:-------------:|:---------:|:-------------|
 | **Fully Connected NN** (from scratch) | 87.48% | 0.2177 | 784 → 300 → 100 → 10 |
-| **CNN** (PyTorch) | **91.73%** | 0.2783 | Conv2D + BatchNorm + Dropout |
+| **CNN** (PyTorch) | **93.19%** | 0.2689 | Conv2D + Deep FC + Dropout + LayerNorm |
 
-### 📈 Performance Improvement
+### 📈 Model Evolution & Performance Journey
+
+| Version | Model | Accuracy | Loss | What Changed | Why It Helped |
+|:-------:|:------|:--------:|:----:|:-------------|:--------------|
+| **v0** | Fully Connected NN | 87.48% | 0.2177 | *Baseline* — from scratch with NumPy | — |
+| **v1** | CNN (Basic) | 91.73% | 0.2783 | Added Conv2D layers + BatchNorm + MaxPool | Spatial feature extraction captures patterns FC layers miss |
+| **v2** | CNN + Deep FC Head | 92.54% | 0.2860 | Added 2× hidden FC layers (1024) + LayerNorm | Deeper classification head learns more complex decision boundaries |
+| **v3** | CNN + Full Regularization | **93.19%** | **0.2689** | Added Dropout(0.1) to FC layers | Prevents overfitting, improves generalization on test data |
+
 ```diff
-+ Accuracy: 87.48% → 91.73% (+4.25%)
+  v0 (FC NN)     → 87.48%  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━▌
++ v1 (CNN)       → 91.73%  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━▌ (+4.25%)
++ v2 (Deep FC)   → 92.54%  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━▌ (+0.81%)
++ v3 (Dropout)   → 93.19%  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━▌ (+0.65%)
 ```
 
-The CNN model achieves a **4.25% accuracy improvement** over the manually-implemented fully connected network, demonstrating how convolutional layers excel at capturing spatial patterns in image data.
+**Total improvement: +5.71% accuracy** through iterative architectural enhancements.
 
 ---
 
@@ -28,8 +39,9 @@ The CNN model achieves a **4.25% accuracy improvement** over the manually-implem
 
 The loss curve shows:
 - **Rapid convergence** in the first ~500 steps
-- **Stable training** with minimal overfitting (training and validation losses track closely)
-- **Final validation loss** settles around ~0.28
+- **Excellent generalization** — validation loss stays below training loss throughout
+- **No overfitting** — thanks to aggressive dropout regularization across all layers
+- **Final validation loss** settles around ~0.20
 
 ---
 
@@ -61,25 +73,42 @@ Input (784) → Hidden1 (300, ReLU) → Hidden2 (100, ReLU) → Output (10, Sigm
 ```
 Input (1×28×28)
     ↓
-Conv2D (64 filters, 3×3) → ReLU → BatchNorm → MaxPool (2×2) → Dropout (0.1)
+┌─────────────────────────────────────────────────────────────┐
+│  CONVOLUTIONAL FEATURE EXTRACTOR                            │
+├─────────────────────────────────────────────────────────────┤
+│  Conv2D (64 filters, 3×3, padding=1)                        │
+│      → ReLU → BatchNorm2D → MaxPool (2×2) → Dropout(0.1)    │
+│                                                             │
+│  Conv2D (128 filters, 3×3)                                  │
+│      → ReLU → BatchNorm2D → MaxPool (2×2) → Dropout(0.1)    │
+└─────────────────────────────────────────────────────────────┘
     ↓
-Conv2D (128 filters, 3×3) → ReLU → BatchNorm → MaxPool (2×2) → Dropout (0.1)
+  Flatten (128×6×6 = 4608)
     ↓
-Flatten → Linear (4608 → 10)
+┌─────────────────────────────────────────────────────────────┐
+│  FULLY CONNECTED CLASSIFICATION HEAD                        │
+├─────────────────────────────────────────────────────────────┤
+│  Linear (4608 → 1024) → ReLU → LayerNorm → Dropout(0.1)     │
+│  Linear (1024 → 1024) → ReLU → LayerNorm → Dropout(0.1)     │
+│  Linear (1024 → 10)   [Output logits]                       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 **Key Features:**
 - ✅ 2 Convolutional layers with increasing filter depth (64 → 128)
-- ✅ Batch Normalization for training stability
-- ✅ Dropout regularization (0.1) to prevent overfitting
+- ✅ Batch Normalization after conv layers for training stability
+- ✅ **2 Hidden fully connected layers** (1024 neurons each)
+- ✅ **Layer Normalization** after FC layers for improved gradient flow
+- ✅ **Dropout (0.1) on ALL layers** — conv blocks AND FC layers
 - ✅ AdamW optimizer with learning rate 3e-4
 - ✅ Cross-Entropy loss function
 - ✅ MPS/CUDA acceleration support
 
 **Highlights:**
-- Achieves **91.73% accuracy** on the test set
+- Achieves **93.19% accuracy** on the test set
 - Trains for 10 epochs with 90/10 train-validation split
-- Produces stable loss curves with minimal overfitting
+- Comprehensive dropout regularization prevents overfitting
+- Layer normalization enables stable training of deeper networks
 
 ---
 
@@ -119,11 +148,17 @@ python cnn_train.py
 | Aspect | Fully Connected NN | CNN |
 |--------|-------------------|-----|
 | **Spatial Awareness** | Treats pixels independently | Learns local patterns (edges, textures) |
-| **Parameter Efficiency** | 784×300 + 300×100 + 100×10 = ~266K params | Shared conv filters = fewer params |
+| **Parameter Efficiency** | ~266K params (dense) | Shared conv filters + deep FC head |
 | **Translation Invariance** | ❌ No | ✅ Yes |
 | **Feature Hierarchy** | Flat representation | Low→High level features |
+| **Normalization** | None | BatchNorm + LayerNorm |
+| **Regularization** | None | **Dropout on ALL layers** |
 
-Convolutional layers are specifically designed for image data—they understand that neighboring pixels are related, making them far more effective for visual classification tasks.
+The CNN architecture combines:
+1. **Convolutional feature extraction** — captures spatial patterns efficiently
+2. **Deep fully connected head** — provides powerful non-linear classification
+3. **Aggressive regularization** — dropout on both conv and FC layers prevents overfitting
+4. **Modern normalization** — BatchNorm + LayerNorm for stable, fast training
 
 ---
 
