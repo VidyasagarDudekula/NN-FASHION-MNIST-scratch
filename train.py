@@ -68,12 +68,13 @@ class NeuralNetwork:
 def test_network(nn_obj):
     if nn_obj is None:
         return None
-    test_data_file = open('fashion-mnist_train.csv', 'r')
+    test_data_file = open('fashion-mnist_test.csv', 'r')
     test_data_lines = test_data_file.readlines()[1:]
     test_data_file.close()
 
     test_results = []
     correct = 0
+    loss = 0.0
     for index, line in enumerate(test_data_lines):
         data = {}
         data['index'] = index
@@ -85,15 +86,19 @@ def test_network(nn_obj):
         data['predicted'] = index
         data['predicted_list'] = predicted_list.tolist()
         data['result'] = data['target'] == data['predicted']
+        loss += -np.log(data['predicted_list'][index]).item()
         if data['result']:
             correct += 1
         test_results.append(data)
+    stats = {"data": test_results}
     accuracy = correct/len(test_data_lines)
-    return accuracy
+    stats['loss'] = loss/len(test_data_lines)
+    stats['accuracy'] = accuracy
+    return stats
 
 def train_network(inputnodes, hiddennodes1, hiddennodes2, outputnodes, learningrate, epochs=4):
     nn = NeuralNetwork(inputnodes=inputnodes, hiddennodes1=hiddennodes1, hiddennodes2=hiddennodes2, outputnodes=outputnodes, learningrate=learningrate)
-    data_file = open('fashion-mnist_test.csv', 'r')
+    data_file = open('fashion-mnist_train.csv', 'r')
     data_lines = data_file.readlines()[1:]
     data_file.close()
     stats = {}
@@ -104,8 +109,8 @@ def train_network(inputnodes, hiddennodes1, hiddennodes2, outputnodes, learningr
             target_list = preprocess_output(line_data[1])
             nn.train(input_list, target_list)
         accuracy = test_network(nn)
-        print(f"Epoch:- {epoch}, accuracy:- {accuracy}")
-        stats[epoch] = accuracy
+        print(f"Epoch:- {epoch}, accuracy:- {accuracy['accuracy']}")
+        stats[epoch] = accuracy['accuracy']
     return nn, stats
 
 
@@ -116,10 +121,11 @@ if __name__ == '__main__':
         hiddennodes1=300,
         hiddennodes2=100,
         outputnodes=10,
-        learningrate=0.012,
-        epochs=10
+        learningrate=0.0001,
+        epochs=15
     )
-    with open('basic_stats.json', 'w') as file:
+    stats = test_network(nn_obj)
+    with open('normal_nn_stats.json', 'w') as file:
         json.dump(stats, file, indent=4)
     
 
